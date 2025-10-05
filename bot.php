@@ -18,6 +18,7 @@ include "Commands/user.php";
 include "Commands/admin.php";
 
 $update = json_decode(file_get_contents("php://input"), true);
+file_put_contents("debug.log", date("Y-m-d H:i:s") . " - Received: " . json_encode($update) . "\n", FILE_APPEND);
 
 if (!$update) {
     http_response_code(400);
