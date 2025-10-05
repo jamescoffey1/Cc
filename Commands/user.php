@@ -168,11 +168,11 @@ function send_profile($chat_id, $first_name, $user_id) {
 }
 
 //SEND SUPPORT 
-//@Darkboy22
+//@AlwaysAvailableForEscrowDeal
 function send_support($chat_id) {
     $msg = "✦━━━━━[  ᴄᴜꜱᴛᴏᴍᴇʀ ꜱᴜᴘᴘᴏʀᴛ ]━━━━━✦
 
-⟡ ᴀᴅᴍɪɴ : @Darkboy22 
+⟡ ᴀᴅᴍɪɴ : @AlwaysAvailableForEscrowDeal 
 ⟡ ᴀᴠᴀɪʟᴀʙʟᴇ : 24/7 sᴜᴘᴘᴏʀᴛ
 ⟡ ɴᴏᴛᴇ : ᴄᴏɴᴛᴀᴄᴛ ᴏɴʟʏ ɪꜰ ɢᴇɴᴜɪɴᴇ
 
