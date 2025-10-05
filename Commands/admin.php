@@ -11,7 +11,8 @@
 */
 
 function is_admin($user_id) {
-    return $user_id == "952847458"; // your admin ID
+    $admin_id = getenv("ADMIN_ID") ?: "952847458"; // Set ADMIN_ID in Replit Secrets or replace here
+    return $user_id == $admin_id;
 }
 
 //SEND BROADCAST 

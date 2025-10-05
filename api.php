@@ -2,8 +2,8 @@
 date_default_timezone_set("Asia/Kolkata");
 
 // === Your Binance API Keys ===
-$apiKey = 'REPLACE_YOUR_BINANCE_API_KEY';
-$apiSecret = 'REPLACE_YOUR_BINANCE_SECERET_KEY';
+$apiKey = getenv('BINANCE_API_KEY') ?: 'REPLACE_YOUR_BINANCE_API_KEY';
+$apiSecret = getenv('BINANCE_SECRET_KEY') ?: 'REPLACE_YOUR_BINANCE_SECERET_KEY';
 
 // === Get Input Parameter ===
 $checkAmount = isset($_GET['check']) ? floatval($_GET['check']) : 0;
