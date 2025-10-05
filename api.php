@@ -1,87 +1,50 @@
 <?php
+require_once "nowpayments.php";
+
 date_default_timezone_set("Asia/Kolkata");
 
-// === Your Binance API Keys ===
-$apiKey = getenv('BINANCE_API_KEY') ?: 'REPLACE_YOUR_BINANCE_API_KEY';
-$apiSecret = getenv('BINANCE_SECRET_KEY') ?: 'REPLACE_YOUR_BINANCE_SECERET_KEY';
+$nowpayments = new NOWPayments();
 
-// === Get Input Parameter ===
-$checkAmount = isset($_GET['check']) ? floatval($_GET['check']) : 0;
+$paymentId = isset($_GET['payment_id']) ? trim($_GET['payment_id']) : '';
 
-if (!$checkAmount) {
+if (!$paymentId) {
     http_response_code(400);
-    echo json_encode(['error' => 'Missing or invalid check amount']);
+    echo json_encode(['error' => 'Missing payment_id parameter']);
     exit;
 }
 
-// === Time Range: Last 24 Hours ===
-$endTime = round(microtime(true) * 1000);
-$startTime = $endTime - (24 * 60 * 60 * 1000);
+$result = $nowpayments->getPaymentStatus($paymentId);
 
-// === Binance API Details ===
-$baseUrl = "https://api.binance.com";
-$endpoint = "/sapi/v1/capital/deposit/hisrec";
-
-$params = [
-    "startTime" => $startTime,
-    "endTime" => $endTime,
-    "timestamp" => $endTime
-];
-
-ksort($params);
-$query = http_build_query($params);
-$signature = hash_hmac('sha256', $query, $apiSecret);
-$query .= "&signature=$signature";
-
-// === CURL Request ===
-$ch = curl_init("$baseUrl$endpoint?$query");
-curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-MBX-APIKEY: $apiKey"]);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-$response = curl_exec($ch);
-curl_close($ch);
-
-// === Parse Binance Response ===
-$data = json_decode($response, true);
-
-if (!is_array($data)) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Binance API error or invalid credentials']);
-    exit;
-}
-
-$matched = null;
-$expectedAmount = round($checkAmount, 2);
-
-foreach ($data as $deposit) {
-    if (!is_array($deposit)) continue;
-    $depositAmount = round(floatval($deposit['amount'] ?? 0), 2);
-    $status = intval($deposit['status'] ?? 0);
-
-    if ($depositAmount == $expectedAmount && $status === 1) {
-        $matched = [
-            "AMOUNT" => $deposit['amount'],
-            "ORDER ID" => $deposit['txId'],
-            "DATE" => date("Y-m-d H:i:s", $deposit['insertTime'] / 1000),
-            "CURRENCY" => strtoupper($deposit['coin']),
-            "NETWORK" => strtoupper($deposit['network']),
-            "STATUS" => "RECEIVED"
-        ];
-        break;
-    }
-}
-
-// === Response Output ===
-if ($matched) {
-    http_response_code(200);
-    echo json_encode([$matched], JSON_PRETTY_PRINT);
-} else {
+if (isset($result['error'])) {
     http_response_code(404);
     echo json_encode([[
-        "AMOUNT" => "0",
-        "ORDER ID" => "NOT FOUND",
-        "DATE" => date("Y-m-d H:i:s"),
-        "CURRENCY" => "UNABLE TO DETECT",
-        "NETWORK" => "NOT FOUND",
-        "STATUS" => "NOT RECEIVED"
+        "PAYMENT_ID" => $paymentId,
+        "STATUS" => "NOT FOUND",
+        "ERROR" => $result['error']
     ]], JSON_PRETTY_PRINT);
+    exit;
 }
+
+$status = strtoupper($result['payment_status'] ?? 'unknown');
+$amount = $result['price_amount'] ?? 0;
+$currency = strtoupper($result['price_currency'] ?? 'USD');
+$payCurrency = strtoupper($result['pay_currency'] ?? '');
+$actuallyPaid = $result['actually_paid'] ?? 0;
+
+$response = [[
+    "PAYMENT_ID" => $paymentId,
+    "AMOUNT" => $amount,
+    "CURRENCY" => $currency,
+    "PAY_CURRENCY" => $payCurrency,
+    "ACTUALLY_PAID" => $actuallyPaid,
+    "STATUS" => $status,
+    "DATE" => date("Y-m-d H:i:s")
+]];
+
+if (in_array($status, ['FINISHED', 'CONFIRMED'])) {
+    http_response_code(200);
+} else {
+    http_response_code(202);
+}
+
+echo json_encode($response, JSON_PRETTY_PRINT);

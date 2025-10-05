@@ -68,6 +68,10 @@ if (is_admin($user_id)) {
 
 if (preg_match('/^\/redeem (\w{16})$/i', $text_lower)) user_redeem_key($chat_id, $user_id, $text);
 
+// Address and SSN Lookup
+if (preg_match('/^\/address (.+)$/i', $text, $m)) address_lookup($chat_id, $user_id, trim($m[1]));
+elseif (preg_match('/^\/ssn (.+)$/i', $text, $m)) ssn_lookup($chat_id, $user_id, trim($m[1]));
+
 
 
 //BUTTON HANDLER

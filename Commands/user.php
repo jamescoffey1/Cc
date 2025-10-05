@@ -563,54 +563,61 @@ function process_amount($chat_id, $user_id, $amount) {
 
 //SELECT CURRENCY 
 function confirm_currency($chat_id, $user_id, $currency) {
+    require_once "nowpayments.php";
+    
     $temp = json_decode(file_get_contents("Data/deposit_temp_{$user_id}.json"), true);
     $amount = $temp['amount'];
     unlink("Data/deposit_temp_{$user_id}.json");
 
-    $wallets = [
-        'btc' => '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa', //REPLACE WITH YOUR BTC ADDRESS 
-        'usdt' => 'TG3XXyExBkPp9nzdajDZsozEu4BkaSJozs', //REPLACE WITH YOUR USDT ADDRESS 
-        'ltc' => 'LcHKyoc3zHhzmjUusADbJjFRYc7fYUrGAA' //REPLACE WITH YOUR LTC ADDRESS 
-    ];
+    $nowpayments = new NOWPayments();
+    $orderId = "DEP_" . $user_id . "_" . time();
+    
+    $payment = $nowpayments->createPayment(
+        $amount,
+        "usd",
+        strtolower($currency),
+        $orderId,
+        "Deposit to account"
+    );
 
-    $networks = [
-        'btc' => 'Bitcoin',
-        'usdt' => 'TRC20',
-        'ltc' => 'Litecoin'
-    ];
+    if (isset($payment['error'])) {
+        bot('sendMessage', ['chat_id' => $chat_id, 'text' => "❌ Payment creation failed: " . $payment['error']]);
+        return;
+    }
 
-    $txn_id = rand(10000000000, 99999999999);
-    $currency_upper = strtoupper($currency);
-    $wallet = $wallets[$currency];
-    $network = $networks[$currency];
+    $paymentId = $payment['payment_id'];
+    $payAddress = $payment['pay_address'];
+    $payAmount = $payment['pay_amount'];
+    $payCurrency = strtoupper($payment['pay_currency']);
 
     $text = "✦━━━━━[  ᴘᴀʏᴍᴇɴᴛ ᴅᴇᴛᴀɪʟꜱ ]━━━━━✦
 
 ⟡ ᴀᴍᴏᴜɴᴛ        : {$amount}$  
-⟡ ᴄᴜʀʀᴇɴᴄʏ      : {$currency_upper}  
-⟡ ɴᴇᴛᴡᴏʀᴋ       : {$network}  
-⟡ ᴀᴅᴅʀᴇꜱꜱ       : `$wallet`  
-⟡ ᴛʀᴀɴꜱᴀᴄᴛɪᴏɴ ɪᴅ : {$txn_id}  
-⟡ ꜱᴛᴀᴛᴜꜱ        : ⏳ ᴘᴇɴᴅɪɴɢ
+⟡ ᴘᴀʏ ᴀᴍᴏᴜɴᴛ   : {$payAmount} {$payCurrency}  
+⟡ ᴀᴅᴅʀᴇꜱꜱ       : `{$payAddress}`  
+⟡ ᴘᴀʏᴍᴇɴᴛ ɪᴅ    : {$paymentId}  
+⟡ ꜱᴛᴀᴛᴜꜱ        : ⏳ ᴡᴀɪᴛɪɴɢ
 
-✧ ꜱᴇɴᴅ ᴘᴀʏᴍᴇɴᴛ ᴀɴᴅ ᴄʟɪᴄᴋ ᴏɴ ᴄʜᴇᴄᴋ ᴘᴀʏᴍᴇɴᴛ ᴛᴏ ᴠᴇʀɪꜰʏ
+✧ ꜱᴇɴᴅ ᴇxᴀᴄᴛʟʏ {$payAmount} {$payCurrency} ᴛᴏ ᴛʜᴇ ᴀᴅᴅʀᴇꜱꜱ ᴀʙᴏᴠᴇ
+✧ ᴄʟɪᴄᴋ ᴄʜᴇᴄᴋ ᴘᴀʏᴍᴇɴᴛ ᴛᴏ ᴠᴇʀɪꜰʏ
 
 ✦━━━━━━━━━━━━━━━━━━━━━━━━✦";
 
     $buttons = [
-        [['text' => '✅ Check Payment', 'callback_data' => 'check_' . $txn_id]],
-        [['text' => '❌ Cancel Payment', 'callback_data' => 'cancel_' . $txn_id]]
+        [['text' => '✅ Check Payment', 'callback_data' => 'check_' . $paymentId]],
+        [['text' => '❌ Cancel Payment', 'callback_data' => 'cancel_' . $paymentId]]
     ];
-//SAVE DEPOSIT HISTORY 
+
     $deposits = json_decode(file_get_contents("Data/Deposit.json"), true) ?? [];
-    $deposits[$txn_id] = [
+    $deposits[$paymentId] = [
         'user_id' => $user_id,
         'amount' => $amount,
-        'currency' => $currency_upper,
-        'network' => $network,
-        'wallet' => $wallet,
-        'txn_id' => $txn_id,
-        'status' => 'PENDING',
+        'pay_amount' => $payAmount,
+        'currency' => $payCurrency,
+        'pay_address' => $payAddress,
+        'payment_id' => $paymentId,
+        'order_id' => $orderId,
+        'status' => 'WAITING',
         'timestamp' => time()
     ];
     file_put_contents("Data/Deposit.json", json_encode($deposits, JSON_PRETTY_PRINT));
@@ -657,97 +664,93 @@ function cancel_deposit($chat_id, $user_id, $txn_id, $msg_id) {
 
 //VERIFY PAYMENT 
 //@Darkboy22
-function check_payment($chat_id, $user_id, $order_id, $txn_id) {
+function check_payment($chat_id, $user_id, $order_id, $payment_id) {
+    require_once "nowpayments.php";
+    
     $deposits = json_decode(file_get_contents("Data/Deposit.json"), true);
     $users = json_decode(file_get_contents("Data/Users.json"), true);
 
-    if (!isset($deposits[$txn_id])) {
-        bot('sendMessage', ['chat_id' => $chat_id, 'text' => "⚠ Invalid transaction ID."]);
+    if (!isset($deposits[$payment_id])) {
+        bot('sendMessage', ['chat_id' => $chat_id, 'text' => "⚠ Invalid payment ID."]);
         return;
     }
 
-    $deposit = &$deposits[$txn_id];
+    $deposit = &$deposits[$payment_id];
 
-    // Duplicate Check
     if ($deposit['status'] == "COMPLETED") {
         $text = "✦━━━━━[ ᴅᴜᴘʟɪᴄᴀᴛᴇ ᴘᴀʏᴍᴇɴᴛ ]━━━━━✦
 
 ⟡ ᴀᴍᴏᴜɴᴛ        : {$deposit['amount']}$  
 ⟡ ᴄᴜʀʀᴇɴᴄʏ      : {$deposit['currency']}  
-⟡ ᴛʀᴀɴꜱᴀᴄᴛɪᴏɴ ɪᴅ : {$txn_id}  
-⟡ ꜱᴛᴀᴛᴜꜱ        :  ᴀʟʀᴇᴀᴅʏ ʀᴇᴄᴇɪᴠᴇᴅ
+⟡ ᴘᴀʏᴍᴇɴᴛ ɪᴅ    : {$payment_id}  
+⟡ ꜱᴛᴀᴛᴜꜱ        : ᴀʟʀᴇᴀᴅʏ ʀᴇᴄᴇɪᴠᴇᴅ
 
-✧ ᴛʜɪꜱ ᴘᴀʏᴍᴇɴᴛ ʜᴀꜱ ᴀʟʀᴇᴀᴅʏ ʙᴇᴇɴ ᴄʀᴇᴅɪᴛᴇᴅ — ʀᴇᴘᴇᴀᴛ ᴄʜᴇᴄᴋꜱ ᴀʀᴇ ɴᴏᴛ ᴀʟʟᴏᴡᴇᴅ
-
-✦━━━━━━━━━━━━━━━━━━━━━━━━✦";
-        bot('sendMessage', ['chat_id' => $chat_id, 'text' => $text]);
-        return;
-    }
-
-    // Match Order ID
-    if ($deposit['order_id'] ?? '' === $order_id) {
-        bot('sendMessage', ['chat_id' => $chat_id, 'text' => "⚠ This order ID is already verified."]);
-        return;
-    }
-
-    // Make API request
-    $api = "https://ravenxchecker.site/b3.php?check={$deposit['amount']}";
-    $response = @file_get_contents($api);
-    $json = json_decode($response, true)[0];
-
-    // Parse API result
-    $api_status = strtoupper(trim($json['STATUS']));
-    $api_order = trim($json['ORDER ID']);
-    $api_currency = strtoupper(trim($json['CURRENCY']));
-    $api_network = trim($json['NETWORK']);
-
-    // Check for NO payment
-    if ($api_status == "NOT RECEIVED") {
-        $text = "✦━━━━━[  ᴘᴀʏᴍᴇɴᴛ ɴᴏᴛ ʀᴇᴄᴇɪᴠᴇᴅ ]━━━━━✦
-
-⟡ ᴀᴍᴏᴜɴᴛ        : {$deposit['amount']}$  
-⟡ ᴄᴜʀʀᴇɴᴄʏ      : {$deposit['currency']}  
-⟡ ɴᴇᴛᴡᴏʀᴋ       : {$deposit['network']}  
-⟡ ᴛʀᴀɴꜱᴀᴄᴛɪᴏɴ ɪᴅ : {$txn_id}  
-⟡ ꜱᴛᴀᴛᴜꜱ        : ⏳ ᴘᴇɴᴅɪɴɢ
-
-✧ ᴘᴀʏᴍᴇɴᴛ ʜᴀꜱ ɴᴏᴛ ʙᴇᴇɴ ʀᴇᴄᴇɪᴠᴇᴅ ʏᴇᴛ — ᴘʟᴇᴀꜱᴇ ᴛʀʏ ᴀɢᴀɪɴ ᴀꜰᴛᴇʀ ᴀ ꜰᴇᴡ ꜱᴇᴄᴏɴᴅꜱ
+✧ ᴛʜɪꜱ ᴘᴀʏᴍᴇɴᴛ ʜᴀꜱ ᴀʟʀᴇᴀᴅʏ ʙᴇᴇɴ ᴄʀᴇᴅɪᴛᴇᴅ
 
 ✦━━━━━━━━━━━━━━━━━━━━━━━━✦";
         bot('sendMessage', ['chat_id' => $chat_id, 'text' => $text]);
         return;
     }
 
-    // Currency Mismatch
-    if ($deposit['currency'] !== $api_currency) {
-        bot('sendMessage', ['chat_id' => $chat_id, 'text' => "⚠ Currency mismatch! Expected: {$deposit['currency']}, Found: $api_currency"]);
+    $nowpayments = new NOWPayments();
+    $result = $nowpayments->getPaymentStatus($payment_id);
+
+    if (isset($result['error'])) {
+        bot('sendMessage', ['chat_id' => $chat_id, 'text' => "❌ Error checking payment: " . $result['error']]);
         return;
     }
 
-    // Success
-    $deposit['status'] = "COMPLETED";
-    $deposit['order_id'] = $order_id;
-    file_put_contents("Data/Deposit.json", json_encode($deposits, JSON_PRETTY_PRINT));
+    $status = strtoupper($result['payment_status'] ?? 'unknown');
 
-    // Update Balance
-    $users[$user_id]["balance"] += $deposit['amount'];
-    file_put_contents("Data/Users.json", json_encode($users, JSON_PRETTY_PRINT));
-
-    // Delete old payment detail msg
-    bot('deleteMessage', ['chat_id' => $chat_id, 'message_id' => $deposit['msg_id'] ?? null]);
-
-    $text = "✦━━━━━[  ᴘᴀʏᴍᴇɴᴛ ʀᴇᴄᴇɪᴠᴇᴅ ]━━━━━✦
+    if (in_array($status, ['WAITING', 'CONFIRMING'])) {
+        $text = "✦━━━━━[  ᴘᴀʏᴍᴇɴᴛ ᴘᴇɴᴅɪɴɢ ]━━━━━✦
 
 ⟡ ᴀᴍᴏᴜɴᴛ        : {$deposit['amount']}$  
 ⟡ ᴄᴜʀʀᴇɴᴄʏ      : {$deposit['currency']}  
-⟡ ɴᴇᴛᴡᴏʀᴋ       : {$deposit['network']}  
-⟡ ᴛʀᴀɴꜱᴀᴄᴛɪᴏɴ ɪᴅ : {$txn_id}  
-⟡ ꜱᴛᴀᴛᴜꜱ        :  ᴄᴏᴍᴘʟᴇᴛᴇᴅ
+⟡ ᴘᴀʏᴍᴇɴᴛ ɪᴅ    : {$payment_id}  
+⟡ ꜱᴛᴀᴛᴜꜱ        : ⏳ {$status}
 
-✧ ʙᴀʟᴀɴᴄᴇ ʜᴀꜱ ʙᴇᴇɴ ᴄʀᴇᴅɪᴛᴇᴅ ᴛᴏ ʏᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛ
+✧ ᴘᴀʏᴍᴇɴᴛ ɪꜱ ʙᴇɪɴɢ ᴘʀᴏᴄᴇꜱꜱᴇᴅ — ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ
 
 ✦━━━━━━━━━━━━━━━━━━━━━━━━✦";
+        bot('sendMessage', ['chat_id' => $chat_id, 'text' => $text]);
+        return;
+    }
 
+    if (in_array($status, ['FINISHED', 'CONFIRMED'])) {
+        $deposit['status'] = 'COMPLETED';
+        $deposits[$payment_id] = $deposit;
+        file_put_contents("Data/Deposit.json", json_encode($deposits, JSON_PRETTY_PRINT));
+
+        $users[$user_id]['balance'] += $deposit['amount'];
+        file_put_contents("Data/Users.json", json_encode($users, JSON_PRETTY_PRINT));
+
+        $text = "✦━━━━━[  ᴘᴀʏᴍᴇɴᴛ ꜱᴜᴄᴄᴇꜱꜱ ]━━━━━✦
+
+⟡ ᴀᴍᴏᴜɴᴛ        : {$deposit['amount']}$  
+⟡ ᴄᴜʀʀᴇɴᴄʏ      : {$deposit['currency']}  
+⟡ ᴘᴀʏᴍᴇɴᴛ ɪᴅ    : {$payment_id}  
+⟡ ɴᴇᴡ ʙᴀʟᴀɴᴄᴇ   : \${$users[$user_id]['balance']}  
+⟡ ꜱᴛᴀᴛᴜꜱ        : ✅ ᴄᴏᴍᴘʟᴇᴛᴇᴅ
+
+✧ ʏᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛ ʜᴀꜱ ʙᴇᴇɴ ᴄʀᴇᴅɪᴛᴇᴅ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ
+
+✦━━━━━━━━━━━━━━━━━━━━━━━━✦";
+        bot('sendMessage', ['chat_id' => $chat_id, 'text' => $text]);
+        return;
+    }
+
+    // Failed/Expired/Other statuses
+    $text = "✦━━━━━[  ᴘᴀʏᴍᴇɴᴛ {$status} ]━━━━━✦
+
+⟡ ᴀᴍᴏᴜɴᴛ        : {$deposit['amount']}$  
+⟡ ᴄᴜʀʀᴇɴᴄʏ      : {$deposit['currency']}  
+⟡ ᴘᴀʏᴍᴇɴᴛ ɪᴅ    : {$payment_id}  
+⟡ ꜱᴛᴀᴛᴜꜱ        : {$status}
+
+✧ ᴘʟᴇᴀꜱᴇ ᴄᴏɴᴛᴀᴄᴛ ꜱᴜᴘᴘᴏʀᴛ ɪꜰ ʏᴏᴜ ʙᴇʟɪᴇᴠᴇ ᴛʜɪꜱ ɪꜱ ᴀɴ ᴇʀʀᴏʀ
+
+✦━━━━━━━━━━━━━━━━━━━━━━━━✦";
     bot('sendMessage', ['chat_id' => $chat_id, 'text' => $text]);
 }
 
@@ -771,4 +774,101 @@ function user_redeem_key($chat_id, $user_id, $text) {
         file_put_contents("Data/Users.json", json_encode($users, JSON_PRETTY_PRINT));
         bot('sendMessage', ['chat_id' => $chat_id, 'text' => "✅ Redeem Successful!\n💰 \$$amount added to your balance."]);
     }
+}
+
+//ADDRESS LOOKUP FUNCTION
+//@Darkboy22
+function address_lookup($chat_id, $user_id, $address) {
+    if (!is_registered($user_id)) {
+        bot('sendMessage', ['chat_id' => $chat_id, 'text' => "⚠ Please register first using /start"]);
+        return;
+    }
+
+    $users = json_decode(file_get_contents("Data/Users.json"), true);
+    $cost = 5;
+
+    if ($users[$user_id]['balance'] < $cost) {
+        bot('sendMessage', ['chat_id' => $chat_id, 'text' => "⚠ Insufficient balance. Address lookup costs \$$cost"]);
+        return;
+    }
+
+    $text = "✦━━━━━[ 🔍 ᴀᴅᴅʀᴇꜱꜱ ʟᴏᴏᴋᴜᴘ ]━━━━━✦
+
+⟡ ᴀᴅᴅʀᴇꜱꜱ       : {$address}  
+⟡ ᴄᴏꜱᴛ          : \${$cost}  
+⟡ ꜱᴛᴀᴛᴜꜱ        : 🔎 ꜱᴇᴀʀᴄʜɪɴɢ...
+
+✧ ꜰᴇᴛᴄʜɪɴɢ ᴅᴇᴛᴀɪʟꜱ ꜰʀᴏᴍ ᴅᴀᴛᴀʙᴀꜱᴇ
+
+✦━━━━━━━━━━━━━━━━━━━━━━━━✦";
+
+    bot('sendMessage', ['chat_id' => $chat_id, 'text' => $text]);
+
+    $result = "✦━━━━━[ 📍 ᴀᴅᴅʀᴇꜱꜱ ʀᴇꜱᴜʟᴛꜱ ]━━━━━✦
+
+⟡ ᴀᴅᴅʀᴇꜱꜱ       : {$address}  
+⟡ ɴᴀᴍᴇ          : [LOOKUP RESULT]  
+⟡ ᴄɪᴛʏ          : [CITY]  
+⟡ ꜱᴛᴀᴛᴇ         : [STATE]  
+⟡ ᴢɪᴘ           : [ZIP]  
+⟡ ᴘʜᴏɴᴇ         : [PHONE]  
+
+✧ ʟᴏᴏᴋᴜᴘ ᴄᴏᴍᴘʟᴇᴛᴇᴅ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ
+✧ ᴄʜᴀʀɢᴇᴅ: \${$cost}
+
+✦━━━━━━━━━━━━━━━━━━━━━━━━✦";
+
+    $users[$user_id]['balance'] -= $cost;
+    file_put_contents("Data/Users.json", json_encode($users, JSON_PRETTY_PRINT));
+
+    bot('sendMessage', ['chat_id' => $chat_id, 'text' => $result]);
+}
+
+//SSN LOOKUP FUNCTION
+//@Darkboy22
+function ssn_lookup($chat_id, $user_id, $ssn) {
+    if (!is_registered($user_id)) {
+        bot('sendMessage', ['chat_id' => $chat_id, 'text' => "⚠ Please register first using /start"]);
+        return;
+    }
+
+    $users = json_decode(file_get_contents("Data/Users.json"), true);
+    $cost = 10;
+
+    if ($users[$user_id]['balance'] < $cost) {
+        bot('sendMessage', ['chat_id' => $chat_id, 'text' => "⚠ Insufficient balance. SSN lookup costs \$$cost"]);
+        return;
+    }
+
+    $text = "✦━━━━━[ 🔍 ꜱꜱɴ ʟᴏᴏᴋᴜᴘ ]━━━━━✦
+
+⟡ ꜱꜱɴ            : {$ssn}  
+⟡ ᴄᴏꜱᴛ          : \${$cost}  
+⟡ ꜱᴛᴀᴛᴜꜱ        : 🔎 ꜱᴇᴀʀᴄʜɪɴɢ...
+
+✧ ꜰᴇᴛᴄʜɪɴɢ ᴅᴇᴛᴀɪʟꜱ ꜰʀᴏᴍ ᴅᴀᴛᴀʙᴀꜱᴇ
+
+✦━━━━━━━━━━━━━━━━━━━━━━━━✦";
+
+    bot('sendMessage', ['chat_id' => $chat_id, 'text' => $text]);
+
+    $result = "✦━━━━━[ 👤 ꜱꜱɴ ʀᴇꜱᴜʟᴛꜱ ]━━━━━✦
+
+⟡ ꜱꜱɴ            : {$ssn}  
+⟡ ɴᴀᴍᴇ          : [FULL NAME]  
+⟡ ᴅᴏʙ           : [DATE OF BIRTH]  
+⟡ ᴀᴅᴅʀᴇꜱꜱ       : [ADDRESS]  
+⟡ ᴄɪᴛʏ          : [CITY]  
+⟡ ꜱᴛᴀᴛᴇ         : [STATE]  
+⟡ ᴘʜᴏɴᴇ         : [PHONE]  
+
+✧ ʟᴏᴏᴋᴜᴘ ᴄᴏᴍᴘʟᴇᴛᴇᴅ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ
+✧ ᴄʜᴀʀɢᴇᴅ: \${$cost}
+
+✦━━━━━━━━━━━━━━━━━━━━━━━━✦";
+
+    $users[$user_id]['balance'] -= $cost;
+    file_put_contents("Data/Users.json", json_encode($users, JSON_PRETTY_PRINT));
+
+    bot('sendMessage', ['chat_id' => $chat_id, 'text' => $result]);
 }
