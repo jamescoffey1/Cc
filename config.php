@@ -1,6 +1,7 @@
 <?php
 if (!defined("BOT_TOKEN")) {
-    define("BOT_TOKEN", getenv("BOT_TOKEN") ?: "YOUR_BOT_TOKEN_HERE");
+    $token = getenv("BOT_TOKEN") ?: ($_ENV["BOT_TOKEN"] ?? ($_SERVER["BOT_TOKEN"] ?? "YOUR_BOT_TOKEN_HERE"));
+    define("BOT_TOKEN", $token);
 }
 
 if (!function_exists('bot')) {
