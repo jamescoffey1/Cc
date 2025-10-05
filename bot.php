@@ -13,7 +13,7 @@
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 */
-include "Config.php";
+include "config.php";
 include "Commands/user.php";
 include "Commands/admin.php";
 
