@@ -31,3 +31,5 @@ tmp/
 # Environment files
 .env
 .env.local
+.bot_token
+webhook_debug.log

@@ -1,6 +1,18 @@
 <?php
 if (!defined("BOT_TOKEN")) {
-    $token = getenv("BOT_TOKEN") ?: ($_ENV["BOT_TOKEN"] ?? ($_SERVER["BOT_TOKEN"] ?? "YOUR_BOT_TOKEN_HERE"));
+    // Try to get token from environment first
+    $token = getenv("BOT_TOKEN") ?: ($_ENV["BOT_TOKEN"] ?? ($_SERVER["BOT_TOKEN"] ?? ""));
+    
+    // If not in environment (web context), read from file
+    if (empty($token) && file_exists(".bot_token")) {
+        $token = trim(file_get_contents(".bot_token"));
+    }
+    
+    // Fallback to placeholder
+    if (empty($token)) {
+        $token = "YOUR_BOT_TOKEN_HERE";
+    }
+    
     define("BOT_TOKEN", $token);
 }
 
