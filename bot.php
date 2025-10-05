@@ -18,10 +18,21 @@ include "Commands/user.php";
 include "Commands/admin.php";
 
 $update = json_decode(file_get_contents("php://input"), true);
-$chat_id = $update["message"]["chat"]["id"] ?? $update["callback_query"]["message"]["chat"]["id"];
-$text = $update["message"]["text"] ?? $update["callback_query"]["data"];
-$first_name = $update["message"]["chat"]["first_name"] ?? $update["callback_query"]["from"]["first_name"];
-$user_id = $update["message"]["from"]["id"] ?? $update["callback_query"]["from"]["id"];
+
+if (!$update) {
+    http_response_code(400);
+    die(json_encode(['error' => 'Invalid request']));
+}
+
+$chat_id = $update["message"]["chat"]["id"] ?? ($update["callback_query"]["message"]["chat"]["id"] ?? null);
+$text = $update["message"]["text"] ?? ($update["callback_query"]["data"] ?? null);
+$first_name = $update["message"]["chat"]["first_name"] ?? ($update["callback_query"]["from"]["first_name"] ?? null);
+$user_id = $update["message"]["from"]["id"] ?? ($update["callback_query"]["from"]["id"] ?? null);
+
+if (!$chat_id || !$user_id) {
+    http_response_code(400);
+    die(json_encode(['error' => 'Missing required fields']));
+}
 
 //COMMAND HANDLER
 //@Darkboy22

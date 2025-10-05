@@ -1,6 +1,4 @@
-
 <?php
-
 date_default_timezone_set("Asia/Kolkata");
 
 // === Your Binance API Keys ===
@@ -53,8 +51,9 @@ $matched = null;
 $expectedAmount = round($checkAmount, 2);
 
 foreach ($data as $deposit) {
-    $depositAmount = round(floatval($deposit['amount']), 2);
-    $status = intval($deposit['status']);
+    if (!is_array($deposit)) continue;
+    $depositAmount = round(floatval($deposit['amount'] ?? 0), 2);
+    $status = intval($deposit['status'] ?? 0);
 
     if ($depositAmount == $expectedAmount && $status === 1) {
         $matched = [
