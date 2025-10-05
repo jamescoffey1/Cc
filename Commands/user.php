@@ -520,10 +520,10 @@ function start_deposit($chat_id, $user_id) {
 
     $text = "✦━━━━━[  ᴅᴇᴘᴏꜱɪᴛ ɪɴɪᴛɪᴀᴛᴇᴅ ]━━━━━✦
 
-⟡ ᴍɪɴɪᴍᴜᴍ   : 2$  
+⟡ ᴍɪɴɪᴍᴜᴍ   : 15$  
 ⟡ ɴᴏᴛᴇ       : ᴘʟᴇᴀꜱᴇ ᴇɴᴛᴇʀ ᴀᴍᴏᴜɴᴛ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ
 
-✧ ᴏɴʟʏ ᴇɴᴛᴇʀ ɴᴜᴍʙᴇʀ (ᴇ.ɢ. 10)
+✧ ᴏɴʟʏ ᴇɴᴛᴇʀ ɴᴜᴍʙᴇʀ (ᴇ.ɢ. 20)
 
 ✦━━━━━━━━━━━━━━━━━━━━━━━━✦";
     bot('sendMessage', ['chat_id' => $chat_id, 'text' => $text]);
@@ -532,8 +532,8 @@ function start_deposit($chat_id, $user_id) {
 function process_amount($chat_id, $user_id, $amount) {
     unlink("Data/deposit_temp_{$user_id}.lock");
 
-    if ($amount < 2) {
-        bot('sendMessage', ['chat_id' => $chat_id, 'text' => "⚠ Minimum deposit is 2$"]);
+    if ($amount < 15) {
+        bot('sendMessage', ['chat_id' => $chat_id, 'text' => "⚠ Minimum deposit is 15$"]);
         return;
     }
 
