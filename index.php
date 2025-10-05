@@ -1,13 +1,13 @@
 <?php
 
-header('Content-Type: application/json');
-
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $requestMethod = $_SERVER['REQUEST_METHOD'];
 
 if (strpos($requestUri, '/api') !== false) {
+    header('Content-Type: application/json');
     include 'api.php';
 } elseif (strpos($requestUri, '/webhook') !== false || strpos($requestUri, '/bot') !== false) {
+    header('Content-Type: application/json');
     include 'bot.php';
 } elseif ($requestUri === '/') {
     http_response_code(200);

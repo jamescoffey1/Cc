@@ -9,6 +9,7 @@ $apiSecret = 'REPLACE_YOUR_BINANCE_SECERET_KEY';
 $checkAmount = isset($_GET['check']) ? floatval($_GET['check']) : 0;
 
 if (!$checkAmount) {
+    http_response_code(400);
     echo json_encode(['error' => 'Missing or invalid check amount']);
     exit;
 }
@@ -43,6 +44,7 @@ curl_close($ch);
 $data = json_decode($response, true);
 
 if (!is_array($data)) {
+    http_response_code(500);
     echo json_encode(['error' => 'Binance API error or invalid credentials']);
     exit;
 }
@@ -69,11 +71,11 @@ foreach ($data as $deposit) {
 }
 
 // === Response Output ===
-header('Content-Type: application/json');
-
 if ($matched) {
+    http_response_code(200);
     echo json_encode([$matched], JSON_PRETTY_PRINT);
 } else {
+    http_response_code(404);
     echo json_encode([[
         "AMOUNT" => "0",
         "ORDER ID" => "NOT FOUND",

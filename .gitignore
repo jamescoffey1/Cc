@@ -1,0 +1,33 @@
+# Sensitive configuration - DO NOT COMMIT
+# config.php should be reviewed before committing to ensure no real tokens are present
+
+# Data files with user information
+Data/Users.json
+Data/Keys.json
+Data/Orders.json
+Data/*.lock
+
+# Card inventory (may contain sensitive data)
+Cards/cc.txt
+Cards/Sold.txt
+Cards/Refund.txt
+
+# System files
+.DS_Store
+Thumbs.db
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+temp/
+tmp/
+
+# Environment files
+.env
+.env.local
