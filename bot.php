@@ -18,7 +18,6 @@ include "Commands/user.php";
 include "Commands/admin.php";
 
 $update = json_decode(file_get_contents("php://input"), true);
-file_put_contents("debug.log", date("Y-m-d H:i:s") . " - Received: " . json_encode($update) . "\n", FILE_APPEND);
 
 if (!$update) {
     http_response_code(400);
@@ -35,17 +34,20 @@ if (!$chat_id || !$user_id) {
     die(json_encode(['error' => 'Missing required fields']));
 }
 
+// Convert commands to lowercase for case-insensitive matching
+$text_lower = strtolower($text);
+
 //COMMAND HANDLER
 //@Darkboy22
-if (strpos($text, "/start") === 0) start_command($chat_id, $first_name, $user_id);
-elseif (strpos($text, "/register") === 0) show_terms($chat_id, $first_name, $user_id);
-elseif (strpos($text, "/menu") === 0 || strpos($text, "/home") === 0) send_menu($chat_id, $first_name, $user_id);
-elseif (strpos($text, "/info") === 0 || strpos($text, "/profile") === 0) send_profile($chat_id, $first_name, $user_id);
-elseif (strpos($text, "/support") === 0 || strpos($text, "/help") === 0) send_support($chat_id);
-elseif (strpos($text, "/acc") === 0 || strpos($text, "/buycc") === 0 || strpos($text, "/bcc") === 0 || strpos($text, "/cc") === 0) show_cards($chat_id, 0);
-elseif (preg_match('/^\/buy (\d+)/', $text, $m)) process_buy($chat_id, $user_id, intval($m[1]) - 1);
-elseif (in_array($text, ["/orders", "/order"])) show_orders($chat_id, $user_id);
-elseif (in_array($text, ['/addfund', '/fund', '/deposit', '/dep'])) {
+if (strpos($text_lower, "/start") === 0) start_command($chat_id, $first_name, $user_id);
+elseif (strpos($text_lower, "/register") === 0) show_terms($chat_id, $first_name, $user_id);
+elseif (strpos($text_lower, "/menu") === 0 || strpos($text_lower, "/home") === 0) send_menu($chat_id, $first_name, $user_id);
+elseif (strpos($text_lower, "/info") === 0 || strpos($text_lower, "/profile") === 0) send_profile($chat_id, $first_name, $user_id);
+elseif (strpos($text_lower, "/support") === 0 || strpos($text_lower, "/help") === 0) send_support($chat_id);
+elseif (strpos($text_lower, "/acc") === 0 || strpos($text_lower, "/buycc") === 0 || strpos($text_lower, "/bcc") === 0 || strpos($text_lower, "/cc") === 0) show_cards($chat_id, 0);
+elseif (preg_match('/^\/buy (\d+)/i', $text_lower, $m)) process_buy($chat_id, $user_id, intval($m[1]) - 1);
+elseif (in_array($text_lower, ["/orders", "/order"])) show_orders($chat_id, $user_id);
+elseif (in_array($text_lower, ['/addfund', '/fund', '/deposit', '/dep'])) {
     start_deposit($chat_id, $user_id);
 }
 elseif (is_numeric($text) && file_exists("Data/deposit_temp_{$user_id}.lock")) {
@@ -58,13 +60,13 @@ elseif (preg_match('/^[a-zA-Z0-9\-_]{5,}$/', $text) && file_exists("Data/check_t
     check_payment($chat_id, $user_id, $order_id, $txn_id);
 }
 if (is_admin($user_id)) {
-    if (strpos($text, "/broad ") === 0) admin_broadcast($chat_id, $text);
-    elseif ($text == "/stat") admin_stats($chat_id);
-    elseif (preg_match('/^\/key (\d+)$/', $text)) admin_generate_key($chat_id, $text);
-    elseif (strpos($text, "/addcc ") === 0) admin_add_cc($chat_id, $text);
+    if (strpos($text_lower, "/broad ") === 0) admin_broadcast($chat_id, $text);
+    elseif ($text_lower == "/stat") admin_stats($chat_id);
+    elseif (preg_match('/^\/key (\d+)$/i', $text_lower)) admin_generate_key($chat_id, $text);
+    elseif (strpos($text_lower, "/addcc ") === 0) admin_add_cc($chat_id, $text);
 }
 
-if (preg_match('/^\/redeem (\w{16})$/', $text)) user_redeem_key($chat_id, $user_id, $text);
+if (preg_match('/^\/redeem (\w{16})$/i', $text_lower)) user_redeem_key($chat_id, $user_id, $text);
 
 
 
